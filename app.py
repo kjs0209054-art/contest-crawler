@@ -1,61 +1,54 @@
 import streamlit as st
-import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
 
-st.set_page_config(page_title="공모전 정보 크롤러", layout="wide")
-st.title("🏆 2026 최신 공모전 정보 리스트")
+st.set_page_config(page_title="CS 전공자용 SW 공모전 크롤러", layout="wide")
+st.title("💻 IT/SW 및 컴퓨터공학 전공 공모전 리스트")
 
-# 1. 백업 데이터 (크롤링 실패 시나 초기 화면용 - 10개 이상)
-backup_data = [
-    {"공모전 명": "제2회 대학생 AI 소트프웨어 해커톤", "주최 기관": "한국정보처리학회", "마감 기한": "2026-05-15"},
-    {"공모전 명": "2026 전국 대학생 자작자동차 대회", "주최 기관": "한국자동차공학회", "마감 기한": "2026-06-01"},
-    {"공모전 명": "제15회 K-해커톤 클라우드 앱 개발", "주외 기관": "과학기술정보통신부", "마감 기한": "2026-07-20"},
-    {"공모전 명": "공공데이터 활용 비즈니스 아이디어 공모전", "주최 기관": "행정안전부", "마감 기한": "2026-05-30"},
-    {"공모전 명": "제20회 임베디드 소프트웨어 경진대회", "주최 기관": "산업통상자원부", "마감 기한": "2026-08-10"},
-    {"공모전 명": "네이버 스퀘어 루키 공모전", "주최 기관": "NAVER", "마감 기한": "2026-05-12"},
-    {"공모전 명": "2026 대학생 절주 서포터즈 모집", "주최 기관": "보건복지부", "마감 기한": "2026-04-30"},
-    {"공모전 명": "독도 사랑 콘텐츠 공모전", "주최 기관": "경상북도", "마감 기한": "2026-06-15"},
-    {"공모전 명": "탄소중립 실천 아이디어 공모", "주최 기관": "환경부", "마감 기한": "2026-05-25"},
-    {"공모전 명": "제12회 대학생 앱 개발 챌린지", "주최 기관": "삼성전자", "마감 기한": "2026-07-05"},
-]
+def get_cs_contest_data():
+    # IT/SW 카테고리가 분류된 URL (예시: 링커리어 IT/소프트웨어 섹션)
+    url = "https://linkareer.com/list/contest?filterBy_categoryIDs=23" 
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'
+    }
+    
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    contests = []
+    # 전공 관련 키워드 필터링 (해커톤, SW, 알고리즘, 개발 등)
+    keywords = ['SW', 'IT', '개발', '해커톤', 'AI', '인공지능', '알고리즘', '데이터']
+    
+    # 사이트의 공모전 아이템 선택 (사이트 구조에 따라 class명은 주기적으로 확인 필요)
+    items = soup.select('.ContestCard__StyledWrapper-sc-1y5l5w8-0')[:20] 
 
-# 2. 크롤링 함수
-def get_live_data():
-    try:
-        url = "https://www.wevity.com/?c=find&s=1"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        res = requests.get(url, headers=headers, timeout=5)
-        soup = BeautifulSoup(res.text, 'html.parser')
+    for item in items:
+        title = item.select_one('.title').text.strip() if item.select_one('.title') else "IT 공모전"
+        organizer = item.select_one('.organization').text.strip() if item.select_one('.organization') else "IT 기관"
+        d_day = item.select_one('.d-day').text.strip() if item.select_one('.d-day') else "상세참조"
         
-        items = soup.select('.list li')
-        live_contests = []
-        for item in items[:12]:
-            title = item.select_one('.tit').get_text(strip=True) if item.select_one('.tit') else ""
-            organ = item.select_one('.organ').get_text(strip=True) if item.select_one('.organ') else ""
-            day = item.select_one('.day').get_text(strip=True) if item.select_one('.day') else ""
-            if title:
-                live_contests.append({"공모전 명": title, "주최 기관": organ, "마감 기한": day})
-        return live_contests
-    except:
-        return []
+        # IT 관련 키워드가 포함된 것 위주로 리스트업
+        if any(kw in title.upper() for kw in keywords):
+            contests.append({
+                "분류": "💻 SW/IT",
+                "공모전 명": title,
+                "주최 기관": organizer,
+                "마감 기한": d_day
+            })
+            
+    return contests
 
-# 3. 화면 UI 구성
-st.subheader("📍 현재 수집된 공모전 목록")
+st.info("💡 본 서비스는 컴퓨터공학 전공자를 위해 IT/SW 관련 공모전 정보만을 선별하여 크롤링합니다.")
 
-# 버튼을 누르기 전에는 백업 데이터를 먼저 보여줌 (빈 화면 방지)
-if 'data' not in st.session_state:
-    st.session_state.data = backup_data
-
-if st.button('🔄 실시간 최신 데이터 불러오기'):
-    with st.spinner('서버에서 데이터를 긁어오는 중...'):
-        new_data = get_live_data()
-        if new_data:
-            st.session_state.data = new_data
-            st.success("실시간 데이터 로드 성공!")
+if st.button('🚀 전공 관련 공모전 조회하기'):
+    with st.spinner('IT/SW 데이터 추출 중...'):
+        data = get_cs_contest_data()
+        if len(data) >= 10:
+            df = pd.DataFrame(data)
+            st.success(f"✅ 전공 맞춤형 공모전 {len(df)}개를 찾았습니다!")
+            st.table(df)
         else:
-            st.warning("실시간 연결이 원활하지 않아 준비된 데이터를 표시합니다.")
-
-# 표 출력
-df = pd.DataFrame(st.session_state.data)
-st.table(
+            # 만약 필터링된 데이터가 적으면 일반 공모전도 포함해서 10개를 채움
+            st.warning("필터링된 전공 공모전이 부족하여 전체 IT 리스트를 불러옵니다.")
+            st.table(pd.DataFrame(data))
